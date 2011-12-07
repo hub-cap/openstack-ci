@@ -34,7 +34,7 @@ CLOUD_SERVERS_USERNAME = os.environ['CLOUD_SERVERS_USERNAME']
 CLOUD_SERVERS_API_KEY = os.environ['CLOUD_SERVERS_API_KEY']
 CLOUD_SERVERS_HOST = os.environ.get('CLOUD_SERVERS_HOST', None)
 CLOUD_SERVERS_PATH = os.environ.get('CLOUD_SERVERS_PATH', None)
-IMAGE_NAME = 'devstack-oneiric'
+IMAGE_NAME = os.environ.get('IMAGE_NAME', 'devstack-oneiric')
 MIN_RAM = 1024
 
 CHANGE = os.environ['GERRIT_CHANGE_NUMBER']
@@ -47,7 +47,6 @@ node_name = 'devstack-%s-%s-%s.slave.openstack.org' % (CHANGE, PATCH, BUILD)
 if CLOUD_SERVERS_DRIVER == 'rackspace':
     Driver = get_driver(Provider.RACKSPACE)
     conn = Driver(CLOUD_SERVERS_USERNAME, CLOUD_SERVERS_API_KEY)
-    images = conn.list_images()
 
     sizes = [sz for sz in conn.list_sizes() if sz.ram >= MIN_RAM]
     sizes.sort(lambda a,b: cmp(a.ram, b.ram))
