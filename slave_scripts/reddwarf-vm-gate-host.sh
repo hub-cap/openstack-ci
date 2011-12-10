@@ -35,7 +35,7 @@ fi
 
 # The workspace has been copied over here by devstack-vm-gate.sh
 mv * /opt/reddwarf
-mv .* /opt/reddwarf/
+mv .git* /opt/reddwarf/
 ln -s /opt/reddwarf/ /src
 ln -s /opt/reddwarf/integration/vagrant /
 cd /opt/reddwarf/integration/vagrant
