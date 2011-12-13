@@ -58,7 +58,4 @@ echo '10.0.4.15	apt.rackspace.com' >> /etc/hosts
 chown -R vagrant /opt/reddwarf/
 
 # Run the CI tests
-sudo -u vagrant ./reddwarf-ci install
-sudo -u vagrant ./reddwarf-ci build
-sudo -u vagrant ./reddwarf-ci initialize
-sudo -u vagrant ./reddwarf-ci test
+sudo -u vagrant ./reddwarf-ci run
