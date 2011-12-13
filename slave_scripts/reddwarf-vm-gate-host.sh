@@ -61,4 +61,4 @@ chown -R vagrant /opt/reddwarf/
 sudo -u vagrant ./reddwarf-ci install
 sudo -u vagrant ./reddwarf-ci build
 sudo -u vagrant ./reddwarf-ci initialize
-sudo -u vagrant ./reddwarf-ci test
+sudo -u vagrant ./reddwarf-ci test --group=dbaas.guest.initialize.failure
