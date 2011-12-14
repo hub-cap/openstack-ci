@@ -52,7 +52,8 @@ iface br100 inet static
 ifconfig eth1:0 33.33.33.11 netmask 255.255.255.255
 ifconfig eth1:1 10.0.4.15 netmask 255.255.255.255
 
-echo '10.0.4.15	apt.rackspace.com' >> /etc/hosts
+echo '10.0.4.15	apt.rackspace.com
+127.0.1.1	host host vagrant' >> /etc/hosts
 hostname host
 
 # Chown manually since the whoami isint correct above yet
