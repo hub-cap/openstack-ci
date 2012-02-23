@@ -86,7 +86,7 @@ if [ ! -d "$VERSIONDIR" ]
 then
 	bzr co bzr://jenkins.openstack.org/ "$VERSIONDIR"
 else
-	( cd $VERSIONDIR ; bzr up )
+	( cd $VERSIONDIR ; bzr up ; bzr revert)
 fi
 
 
@@ -100,7 +100,7 @@ SEPARATOR=${SEPARATOR:-'~'}
 rm -f dist/*.tar.gz
 if [ -f setup.py ] ; then
     # swift has no virtualenv information in its tree.
-    if [ -d .*-venv ] ; then
+    if [ -d .venv -o -f tools/with_venv.sh ] ; then
         tools/with_venv.sh python setup.py sdist
     else
         python setup.py sdist
@@ -127,6 +127,8 @@ else
     mkdir dist
     tar cvfz dist/${projectversion}${SEPARATOR}${snapshotversion}.tar.gz ${projectversion}
 fi
+
+(cd $VERSIONDIR; bzr up)
 
 echo "$PROJECT ${snapshotversion}" >> "$RECORDFILE"
 sort "$RECORDFILE" > "$RECORDFILE".tmp

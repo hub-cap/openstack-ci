@@ -1,6 +1,6 @@
-#!/bin/bash -xe
+#!/usr/bin/env python
 
-# Update the VM used in devstack deployments.
+# Fetch a ready VM for use by devstack.
 
 # Copyright (C) 2011 OpenStack LLC.
 #
@@ -18,14 +18,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CI_SCRIPT_DIR=$(cd $(dirname "$0") && pwd)
-cd $WORKSPACE
+import vmdatabase
 
-if [[ ! -e devstack ]]; then
-    git clone https://review.openstack.org/p/openstack-dev/devstack
-fi
-cd devstack
-git remote update
-cd $WORKSPACE
+db = vmdatabase.VMDatabase()
+node = db.getMachineForUse()
 
-$CI_SCRIPT_DIR/devstack-vm-update-image.py
+if not node:
+    raise Exception("No ready nodes")
+
+print "NODE_IP_ADDR=%s" % node['ip']
+print "NODE_UUID=%s" % node['uuid']

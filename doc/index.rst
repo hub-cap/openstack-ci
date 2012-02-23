@@ -25,7 +25,7 @@ Contents:
    systems
    jenkins
    gerrit
-   tarmac
+   puppet
 
 Indices and tables
 ==================

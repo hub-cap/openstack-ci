@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/bash -x
 
-# Script that is run on the devstack vm; configures and 
+# Script that is run on the devstack vm; configures and
 # invokes devstack.
 
 # Copyright (C) 2011 OpenStack LLC.
@@ -47,9 +47,30 @@ RABBIT_PASSWORD=secret
 ADMIN_PASSWORD=secret
 SERVICE_TOKEN=111222333444
 ROOTSLEEP=0
-ENABLED_SERVICES=g-api,g-reg,key,n-api,n-cpu,n-net,n-sch,mysql,rabbit
-SKIP_EXERCISES=swift
+ENABLED_SERVICES=g-api,g-reg,key,n-api,n-crt,n-obj,n-cpu,n-net,n-vol,n-sch,mysql,rabbit
+SKIP_EXERCISES=boot_from_volume,client-env,swift
+SERVICE_HOST=127.0.0.1
+SYSLOG=True
 EOF
+
+# The vm template update job should cache some images in ~/files.
+# Move them to where devstack expects:
+if ls ~/cache/files/*; then
+    mv ~/cache/files/* /opt/stack/devstack/files
+fi
+
+# Move the PIP cache into position:
+sudo mkdir -p /var/cache/pip
+sudo mv ~/cache/pip/* /var/cache/pip
+
+# Start with a fresh syslog
+sudo stop rsyslog
+sudo mv /var/log/syslog /var/log/syslog-pre-devstack
+sudo touch /var/log/syslog
+sudo chown /var/log/syslog --ref /var/log/syslog-pre-devstack
+sudo chmod /var/log/syslog --ref /var/log/syslog-pre-devstack
+sudo chmod a+r /var/log/syslog
+sudo start rsyslog
 
 ./stack.sh
 ./exercise.sh

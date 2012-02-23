@@ -34,12 +34,19 @@ Host Installation
 
 Prepare Host
 ------------
+This sets the host up with the standard OpenStack system
+administration configuration.  Skip this if you're not setting up a
+host for use by the OpenStack project.
+
 ::
 
   apt-get install bzr puppet emacs23-nox
   bzr branch lp:~mordred/+junk/osapuppetconf
   cd osapuppetconf/
   puppet apply --modulepath=`pwd`/modules manifests/site.pp
+
+This sets up the firewall and installs some dependencies for Gerrit::
+
   apt-get install ufw
   ufw enable
   ufw allow from any to any port 22
@@ -182,6 +189,15 @@ Set Gerrit to start on boot::
   GERRIT_SITE=/home/gerrit2/review_site
   EOF
 
+Add "Approved" review type to gerrit::
+
+  mysql -u root -p
+  use reviewdb;
+  insert into approval_categories values ('Approved', 'A', 2, 'MaxNoBlock', 'N', 'APRV');
+  insert into approval_category_values values ('No score', 'APRV', 0);    
+  insert into approval_category_values values ('Approved', 'APRV', 1);
+  update approval_category_values set name = "Looks good to me (core reviewer)" where name="Looks good to me, approved";
+
 Install Apache
 --------------
 ::
@@ -289,6 +305,19 @@ shell command build step (no other configuration)::
 
 Later, we will configure Jenkins jobs that we want to behave this way
 to use this build step.
+
+Auto Review Expiry
+==================
+
+Puppet automatically installs a daily cron job called ``expire_old_reviews.py``
+onto the gerrit servers.  This script follows two rules:
+
+ #. If the review hasn't been touched in 2 weeks, mark as abandoned.
+ #. If there is a negative review and it hasn't been touched in 1 week, mark as
+    abandoned.
+
+If your review gets touched by either of these rules it is possible to
+unabandon a review on the gerrit web interface.
 
 Launchpad Sync
 ==============
@@ -500,12 +529,17 @@ In jenkins, under source code management:
   * click "advanced"
 
     * refspec: $GERRIT_REFSPEC
+    * branches: origin/$GERRIT_BRANCH
     * click "advanced"
 
       * choosing stragety: gerrit trigger
 
-
 * select gerrit event under build triggers:
+
+  * Trigger on Comment Added
+
+    * Approval Category: APRV
+    * Approval Value: 1
 
   * plain openstack/project
   * path **
@@ -530,7 +564,7 @@ Pull requests can not be disabled for a project in Github, so instead
 we have a script that runs from cron to close any open pull requests
 with instructions to use Gerrit.  
 
-* Edit openstack/openstack-ci-puppet:site.pp
+* Edit openstack/openstack-ci-puppet:manifests/site.pp
 
 and add the project to the list of github projects in the gerrit class
 for the gerrit.openstack.org node.
@@ -563,6 +597,22 @@ So, for instance, to do glance, you would do:
 And you will then have a git repo of glance in the glance dir. This git repo
 is now suitable for uploading in to gerrit to become the new master repo.
 
+Project Config
+==============
+
+There are a few options which need to be enabled on the project in the Admin
+interface.
+
+* Merge Strategy should be set to "Merge If Necessary"
+* "Automatically resolve conflicts" should be enabled
+* "Require Change-Id in commit message" should be enabled
+* "Require a valid contributor agreement to upload" should be enabled
+
+Optionally, if the PTL agrees to it:
+
+* "Require the first line of the commit to be 50 characters or less" should
+  be enabled.
+
 .. _acl:
 
 Access Controls
@@ -579,9 +629,10 @@ High level goals:
    annotated tags).
 #. Members of $PROJECT-core group can perform full code review 
    (blocking or approving: +/- 2), and submit changes to be merged.
-#. Members of openstack-release (Release Manager and PTLs) exclusively
-   can perform full code review (blocking or approving: +/- 2), and
-   submit changes to be merged on milestone-proposed branches.
+#. Members of openstack-release (Release Manager and PTLs), and
+   $PROJECT-drivers (PTL and release minded people) exclusively can
+   perform full code review (blocking or approving: +/- 2), and submit
+   changes to be merged on milestone-proposed branches.
 #. Full code review (+/- 2) of API projects should be available to the
    -core group of the corresponding implementation project as well as to
    the OpenStack Documentation Coordinators.
@@ -599,8 +650,8 @@ These permissions try to achieve the high level goals::
   All Projects (metaproject):
     refs/*
       read: anonymous
-      push annotated tag: release managers, ci tools
-      forge author identity: project bootstrappers  
+      push annotated tag: release managers, ci tools, project bootstrappers
+      forge author identity: registered users
       forge committer identity: project bootstrappers  
       push (w/ force push): project bootstrappers  
       create reference: project bootstrappers, release managers
@@ -610,15 +661,28 @@ These permissions try to achieve the high level goals::
       push: registered users
 
     refs/heads/*
-      label code review -1/+1: registered users
-      label verified -1/+1: ci tools
+      label code review: 
+        -1/+1: registered users
+        -2/+2: project bootstrappers
+      label verified:
+        -1/+1: ci tools
+        -1/+1: project bootstrappers
+      label approved 0/+1: project bootstrappers
       submit: ci tools
+      submit: project bootstrappers
     
     refs/heads/milestone-proposed
-      label code review -2/+2: openstack-release (exclusive)
+      label code review (exclusive):
+        -2/+2 openstack-release
+        -1/+1 registered users
+      label approved (exclusive): 0/+1: openstack-release
+      owner: openstack-release
 
     refs/heads/stable/*
-      label code review -2/+2: opestack-stable-maint
+      label code review (exclusive):
+        -2/+2 opestack-stable-maint
+        -1/+1 registered users
+      label approved (exclusive): 0/+1: opestack-stable-maint
 
     refs/meta/config
       read: project owners
@@ -626,20 +690,22 @@ These permissions try to achieve the high level goals::
   API Projects (metaproject):
     refs/*
       owner: Administrators
-      forge author identity: openstack-doc-core
-      forge committer identity: openstack-doc-core
 
     refs/heads/*
       label code review -2/+2: openstack-doc-core
+      label approved 0/+1: openstack-doc-core
 
   project foo:
     refs/*
       owner: Administrators
-      forge author identity: foo-core
-      forge committer identity: foo-core
 
     refs/heads/*
       label code review -2/+2: foo-core
+      label approved 0/+1: foo-core
+
+    refs/heads/milestone-proposed
+      label code review -2/+2: foo-drivers
+      label approved 0/+1: foo-drivers
 
 Renaming a Project
 ******************
@@ -689,3 +755,58 @@ To rename a project:
 
 Developers will either need to re-clone a new copy of the repository,
 or manually update their remotes.
+
+Adding A New Project On The Command Line
+****************************************
+
+All of the steps involved in adding a new project to Gerrit can be
+accomplished via the commandline, with the exception of creating a new repo
+on github and adding the jenkins jobs.
+
+First of all, add the .gitreview file to the repo that will be added. Then,
+assuming an ssh config alias of `review` for the gerrit instance, as a person
+in the Project Bootstrappers group::
+
+     ssh review gerrit create-project --name openstack/$PROJECT
+     git review -s
+     git push gerrit HEAD:refs/heads/master
+     git push --tags gerrit
+
+At this point, the branch contents will be in gerrit, and the project config
+settings and ACLs need to be set. These are maintained in a special branch
+inside of git in gerrit. Check out the branch from git::
+
+     git fetch gerrit +refs/meta/*:refs/remotes/gerrit-meta/*
+     git checkout -b config remotes/gerrit-meta/config
+
+There will be two interesting files, `groups` and `project.config`. `groups`
+contains UUIDs and names of groups that will be referenced in
+`project.config`. There is a helper script in the openstack-ci repo called
+`get_group_uuid.py` which will fetch the UUID for a given group. For
+$PROJECT-core and $PROJECT-drivers::
+
+      openstack-ci/gerrit/get_group_uuid.py $GROUP_NAME
+
+And make entries in `groups` for each one of them. Next, edit
+`project.config` to look like::
+
+      [access "refs/*"]
+              owner = group Administrators
+      [receive]
+              requireChangeId = true
+              requireContributorAgreement = true
+      [submit]
+              mergeContent = true
+      [access "refs/heads/*"]
+              label-Code-Review = -2..+2 group $PROJECT-core
+              label-Approved = +0..+1 group $PROJECT-core
+      [access "refs/heads/milestone-proposed"]
+              label-Code-Review = -2..+2 group $PROJECT-drivers
+              label-Approved = +0..+1 group $PROJECT-drivers
+
+Replace $PROJECT with the name of the project.
+
+Finally, commit the changes and push the config back up to Gerrit::
+
+      git commit -m "Initial project config"
+      git push gerrit HEAD:refs/meta/config
