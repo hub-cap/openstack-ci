@@ -19,7 +19,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PROJECTS="openstack/nova openstack/glance openstack/keystone openstack/python-novaclient openstack/python-keystoneclient openstack-dev/devstack openstack/openstack-ci"
+PROJECTS="openstack/nova openstack/glance openstack/keystone openstack/python-novaclient openstack/python-keystoneclient openstack-dev/devstack openstack/openstack-ci openstack/horizon"
 
 # Set this to 1 to always keep the host around
 ALWAYS_KEEP=${ALWAYS_KEEP:-0}
@@ -46,10 +46,10 @@ do
 	BRANCH=master
     fi
     git reset --hard
-    git clean -x -f
+    git clean -x -f -d -q
     git checkout $BRANCH
     git reset --hard remotes/origin/$BRANCH
-    git clean -x -f
+    git clean -x -f -d -q
 
     if [[ $GERRIT_PROJECT == $PROJECT ]]; then
 	echo "  Merging proposed change"
@@ -65,6 +65,13 @@ done
 # Set CI_SCRIPT_DIR to point to opestack-ci in the workspace so that
 # we are testing the proposed change from this point forward.
 CI_SCRIPT_DIR=$WORKSPACE/openstack-ci/slave_scripts
+
+# Also, if we're testing openstack-ci, re-exec this script once so
+# that we can test the new version of it.
+if [[ $GERRIT_PROJECT == "openstack/openstack-ci" ]] && [[ $RE_EXEC != "true" ]]; then
+    export RE_EXEC="true"
+    exec $CI_SCRIPT_DIR/devstack-vm-gate.sh
+fi
 
 FETCH_OUTPUT=`$CI_SCRIPT_DIR/devstack-vm-fetch.py` || exit $?
 eval $FETCH_OUTPUT
